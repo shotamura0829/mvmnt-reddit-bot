@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+dashboard/.env.local
+dashboard/node_modules/
+dashboard/.next/
