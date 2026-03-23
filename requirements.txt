@@ -1,0 +1,5 @@
+praw
+anthropic
+supabase
+python-dotenv
+requests
