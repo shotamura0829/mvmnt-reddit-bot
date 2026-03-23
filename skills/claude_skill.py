@@ -19,6 +19,26 @@ def _get_client():
 
 
 # ============================================================
+# MVMNTコンテキスト（プロンプト用・非公開情報）
+# ============================================================
+
+_MVMNT_CONTEXT = """
+MVMNTは「暗号資産を日常で使えるようにする」ショッピングプラットフォームです。
+核心テーマ:
+- HODLからUSEへ：暗号資産を実際の買い物に使う体験
+- 購入時に自動寄付＋ポイント還元（キャッシュバック）
+- AIエージェントマーケットプレイス（自動販売・カスタマーサポート）
+- コミュニティ予測市場（商品人気度の予測で利益化）
+- 分散型信用スコア（買い物・寄付データから生成）
+- VC資金を拒否、コミュニティ主導で運営
+- 紹介プログラム（手数料100%還元モデル）
+
+重要: MVMNTはまだ公開前のため、返信ドラフトではMVMNTに直接言及してはいけない。
+代わりに、投稿のテーマに共感を示し、「こういうプラットフォームがあればいいのに」
+「この方向性は正しいと思う」といった自然な形で会話に参加する方針。
+"""
+
+# ============================================================
 # モックデータ
 # ============================================================
 
@@ -32,7 +52,8 @@ _MOCK_WARMUP_COMMENTS = [
 
 
 def analyze_post(title: str, body: str) -> dict:
-    """関数A: マーケティング分析。翻訳・危険度・熱量・返信ドラフトをJSONで返す。"""
+    """関数A: マーケティング分析。翻訳・危険度・熱量・返信ドラフトをJSONで返す。
+    MVMNTには直接言及しない返信ドラフトを生成する。"""
     if USE_MOCK:
         print(f"[Claude MOCK] analyze_post: {title[:50]}")
         risk = random.randint(1, 10)
@@ -42,8 +63,8 @@ def analyze_post(title: str, body: str) -> dict:
             "body_ja": f"[翻訳] {body[:100]}..." if body else "(本文なし)",
             "risk_score": risk,
             "heat_score": heat,
-            "reply_draft_en": f"Great post! Movement Network's approach with Move VM on Ethereum L2 is worth watching.",
-            "reply_draft_ja": f"素晴らしい投稿です！Movement NetworkのMove VM on Ethereum L2のアプローチは注目に値します。",
+            "reply_draft_en": "I've been thinking the same thing. The whole space needs platforms that let you actually spend crypto like normal money, with real cashback and community governance.",
+            "reply_draft_ja": "同感です。暗号資産を普通のお金のように使えて、キャッシュバックやコミュニティ主導のガバナンスがあるプラットフォームが必要ですよね。",
         }
 
     client = _get_client()
@@ -51,15 +72,24 @@ def analyze_post(title: str, body: str) -> dict:
     prompt = f"""あなたはWeb3マーケティングの専門家です。
 以下のReddit投稿を分析し、**必ず下記のJSON形式のみ**で回答してください。
 
+{_MVMNT_CONTEXT}
+
 投稿タイトル: {title}
 投稿本文: {body}
+
+分析ルール:
+- risk_score: 投稿への返信が炎上やネガティブ反応を招くリスク
+- heat_score: 投稿自体の注目度・バズ度合い
+- reply_draft_en/ja: MVMNTには一切言及せず、投稿のテーマに自然に共感する返信を作成。
+  「自分もこういう体験がほしい」「この方向性は面白い」のような、同じ関心を持つ一般ユーザーの立場で書く。
+  宣伝っぽさを完全に排除し、自然な会話として成立させること。
 
 {{
   "title_ja": "タイトルの日本語訳",
   "body_ja": "本文の日本語訳（要約可）",
-  "risk_score": 1-10の整数（1=安全, 10=炎上リスク大）,
-  "heat_score": 1-10の整数（1=無関心, 10=バズ中）,
-  "reply_draft_en": "英語での返信ドラフト",
+  "risk_score": 1-10の整数,
+  "heat_score": 1-10の整数,
+  "reply_draft_en": "英語での返信ドラフト（MVMNT言及禁止・自然な共感コメント）",
   "reply_draft_ja": "日本語での返信ドラフト"
 }}"""
 
