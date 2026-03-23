@@ -88,3 +88,54 @@ def get_recent_posts(limit: int = 20) -> list[dict]:
     except Exception as e:
         print(f"[DB] 取得エラー: {e}")
         return []
+
+
+# ---------------------------------------------------------------------------
+# Farming History
+# ---------------------------------------------------------------------------
+
+FARMING_TABLE = "farming_history"
+
+
+def save_farming_comment(post_id: str, subreddit: str, comment_id: str, comment_text: str) -> bool:
+    """ファーミングコメントを farming_history テーブルに保存する。"""
+
+    row = {
+        "post_id": post_id,
+        "subreddit": subreddit,
+        "comment_id": comment_id,
+        "comment_text": comment_text,
+    }
+
+    if _mock_mode or _client is None:
+        print(f"[DB][MOCK] save_farming_comment: post_id={post_id}, subreddit={subreddit}, comment_id={comment_id}")
+        return True
+
+    try:
+        _client.table(FARMING_TABLE).insert(row).execute()
+        print(f"[DB] ファーミングコメント保存完了: comment_id={comment_id}")
+        return True
+    except Exception as e:
+        print(f"[DB] ファーミングコメント保存エラー: {e}")
+        return False
+
+
+def get_farming_stats() -> dict:
+    """ファーミング統計を取得する。合計コメント数とサブレディット別内訳を返す。"""
+
+    if _mock_mode or _client is None:
+        print("[DB][MOCK] get_farming_stats")
+        return {"total": 0, "by_subreddit": {}}
+
+    try:
+        response = _client.table(FARMING_TABLE).select("subreddit").execute()
+        rows = response.data
+        total = len(rows)
+        by_subreddit: dict[str, int] = {}
+        for row in rows:
+            sub = row.get("subreddit", "unknown")
+            by_subreddit[sub] = by_subreddit.get(sub, 0) + 1
+        return {"total": total, "by_subreddit": by_subreddit}
+    except Exception as e:
+        print(f"[DB] ファーミング統計取得エラー: {e}")
+        return {"total": 0, "by_subreddit": {}}

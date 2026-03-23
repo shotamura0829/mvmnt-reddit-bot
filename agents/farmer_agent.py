@@ -1,8 +1,9 @@
 import time
 import random
-from skills.reddit_skill import get_rising_posts, post_comment, USE_MOCK
+from skills.reddit_skill import get_rising_posts, post_comment
 from skills.claude_skill import generate_warmup_comment
 from skills.discord_skill import send_discord_message
+from skills.db_skill import save_farming_comment
 
 AGENT_NAME = "👩‍🌾 FarmerAgent"
 WARMUP_SUBREDDITS = ["AskReddit", "Showerthoughts", "mildlyinteresting", "todayilearned"]
@@ -36,11 +37,14 @@ def run(max_comments: int = 3, delay_range: tuple = (30, 90)):
                 "comment_id": comment_id,
                 "comment_text": comment_text,
             })
+            save_farming_comment(
+                post_id=post["id"],
+                subreddit=post["subreddit"],
+                comment_id=comment_id,
+                comment_text=comment_text,
+            )
 
-        if USE_MOCK:
-            delay = 1
-        else:
-            delay = random.randint(*delay_range)
+        delay = random.randint(*delay_range)
         send_discord_message(AGENT_NAME, f"⏳ 次のコメントまで {delay}秒 待機...")
         time.sleep(delay)
 

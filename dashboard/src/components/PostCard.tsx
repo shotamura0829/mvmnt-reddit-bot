@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 import type { RedditPost } from "@/lib/supabase";
 import RiskBadge from "./RiskBadge";
 
@@ -13,8 +14,44 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function PostCard({ post }: { post: RedditPost }) {
+const statusConfig = {
+  pending: { label: "Pending", bg: "bg-yellow-500/15", text: "text-yellow-400", border: "border-yellow-500/30" },
+  approved: { label: "Approved", bg: "bg-blue-500/15", text: "text-blue-400", border: "border-blue-500/30" },
+  posted: { label: "Posted", bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30" },
+  skipped: { label: "Skipped", bg: "bg-gray-500/15", text: "text-gray-400", border: "border-gray-500/30" },
+} as const;
+
+type PostCardProps = {
+  post: RedditPost;
+  onStatusChange?: () => void;
+};
+
+export default function PostCard({ post, onStatusChange }: PostCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const status = post.status || "pending";
+  const badge = statusConfig[status] || statusConfig.pending;
+
+  async function updateStatus(newStatus: string) {
+    setUpdating(true);
+    const updateData: Record<string, unknown> = { status: newStatus };
+    if (newStatus === "posted") {
+      updateData.posted_at = new Date().toISOString();
+    }
+    await supabase.from("reddit_posts").update(updateData).eq("id", post.id);
+    setUpdating(false);
+    onStatusChange?.();
+  }
+
+  async function copyReply() {
+    if (post.reply_draft_en) {
+      await navigator.clipboard.writeText(post.reply_draft_en);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
 
   return (
     <div
@@ -25,6 +62,9 @@ export default function PostCard({ post }: { post: RedditPost }) {
       <div className="flex items-start justify-between gap-4 mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${badge.bg} ${badge.text} ${badge.border}`}>
+              {badge.label}
+            </span>
             <span className="text-xs font-medium text-accent-light bg-accent/10 px-2.5 py-1 rounded-full">
               r/{post.subreddit}
             </span>
@@ -70,7 +110,7 @@ export default function PostCard({ post }: { post: RedditPost }) {
             {/* Japanese translation */}
             {post.body_ja && (
               <div className="bg-background/50 rounded-xl p-4 border border-border/50 mt-2">
-                <p className="text-xs text-accent-light mb-1 font-medium">🇯🇵 日本語訳</p>
+                <p className="text-xs text-accent-light mb-1 font-medium">日本語訳</p>
                 <p className="text-sm text-muted leading-relaxed">
                   {post.body_ja}
                 </p>
@@ -91,7 +131,7 @@ export default function PostCard({ post }: { post: RedditPost }) {
             {/* Japanese reference translation */}
             {post.reply_draft_ja && (
               <div className="bg-background/50 rounded-xl p-4 border border-border/50 mt-2">
-                <p className="text-xs text-accent-light mb-1 font-medium">🇯🇵 参考訳</p>
+                <p className="text-xs text-accent-light mb-1 font-medium">参考訳</p>
                 <p className="text-sm text-muted leading-relaxed">
                   {post.reply_draft_ja}
                 </p>
@@ -99,14 +139,39 @@ export default function PostCard({ post }: { post: RedditPost }) {
             )}
           </div>
 
-          {/* Link */}
-          <div className="flex justify-end">
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 pt-2 border-t border-border">
+            {status !== "approved" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); updateStatus("approved"); }}
+                disabled={updating}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-500/15 text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 transition-all disabled:opacity-50"
+              >
+                Approve
+              </button>
+            )}
+            {status !== "skipped" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); updateStatus("skipped"); }}
+                disabled={updating}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-gray-500/15 text-gray-400 border border-gray-500/30 hover:bg-gray-500/25 transition-all disabled:opacity-50"
+              >
+                Skip
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); copyReply(); }}
+              className="px-4 py-2 rounded-xl text-sm font-medium bg-accent/10 text-accent-light border border-accent/30 hover:bg-accent/20 transition-all"
+            >
+              {copied ? "Copied!" : "Copy Reply"}
+            </button>
+
             <a
               href={post.url}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-xs text-accent-light hover:underline"
+              className="ml-auto text-xs text-accent-light hover:underline"
             >
               Open on Reddit &rarr;
             </a>

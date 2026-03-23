@@ -21,4 +21,6 @@ export type RedditPost = {
   reply_draft_en: string;
   reply_draft_ja: string;
   analyzed_at: string;
+  status: "pending" | "approved" | "posted" | "skipped";
+  posted_at: string | null;
 };

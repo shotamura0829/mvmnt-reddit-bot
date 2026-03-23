@@ -8,11 +8,15 @@ import Header from "./Header";
 import StatsCard from "./StatsCard";
 import PostCard from "./PostCard";
 
+type ScoreFilter = "all" | "high_risk" | "hot";
+type StatusFilter = "all" | "pending" | "approved" | "posted" | "skipped";
+
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "high_risk" | "hot">("all");
+  const [filter, setFilter] = useState<ScoreFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const fetchPosts = useCallback(async () => {
     const { data } = await supabase
@@ -44,8 +48,14 @@ export default function Dashboard() {
   }, [fetchPosts]);
 
   const filteredPosts = posts.filter((p) => {
-    if (filter === "high_risk") return p.risk_score >= 7;
-    if (filter === "hot") return p.heat_score >= 7;
+    // Score filter
+    if (filter === "high_risk" && p.risk_score < 7) return false;
+    if (filter === "hot" && p.heat_score < 7) return false;
+    // Status filter
+    if (statusFilter !== "all") {
+      const postStatus = p.status || "pending";
+      if (postStatus !== statusFilter) return false;
+    }
     return true;
   });
 
@@ -58,6 +68,20 @@ export default function Dashboard() {
       ? (posts.reduce((s, p) => s + (p.heat_score || 0), 0) / posts.length).toFixed(1)
       : "0";
   const subreddits = new Set(posts.map((p) => p.subreddit)).size;
+  const pendingCount = posts.filter((p) => !p.status || p.status === "pending").length;
+
+  const statusTabs: { key: StatusFilter; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "pending", label: "Pending" },
+    { key: "approved", label: "Approved" },
+    { key: "posted", label: "Posted" },
+    { key: "skipped", label: "Skipped" },
+  ];
+
+  function statusCount(s: StatusFilter): number {
+    if (s === "all") return posts.length;
+    return posts.filter((p) => (p.status || "pending") === s).length;
+  }
 
   return (
     <div className="min-h-screen">
@@ -84,6 +108,17 @@ export default function Dashboard() {
             color="accent"
           />
           <StatsCard
+            label="Pending"
+            value={pendingCount}
+            sub="awaiting review"
+            icon={
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            color={pendingCount > 0 ? "warning" : "success"}
+          />
+          <StatsCard
             label="Avg Risk"
             value={avgRisk}
             sub="/ 10"
@@ -105,24 +140,33 @@ export default function Dashboard() {
             }
             color={Number(avgHeat) > 6 ? "danger" : Number(avgHeat) > 3 ? "warning" : "success"}
           />
-          <StatsCard
-            label="Subreddits"
-            value={subreddits}
-            sub="monitored"
-            icon={
-              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
-              </svg>
-            }
-            color="accent"
-          />
         </div>
 
-        {/* Filter tabs */}
+        {/* Status filter tabs */}
+        <div className="flex items-center gap-2 mb-4">
+          {statusTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setStatusFilter(tab.key)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                statusFilter === tab.key
+                  ? "bg-accent text-white shadow-lg shadow-accent/25"
+                  : "bg-card text-muted hover:text-foreground border border-border hover:border-accent/50"
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1.5 opacity-70">
+                ({statusCount(tab.key)})
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Score filter tabs */}
         <div className="flex items-center gap-2 mb-6">
           {(
             [
-              { key: "all", label: "All Posts" },
+              { key: "all", label: "All Scores" },
               { key: "high_risk", label: "High Risk" },
               { key: "hot", label: "Hot" },
             ] as const
@@ -132,7 +176,7 @@ export default function Dashboard() {
               onClick={() => setFilter(tab.key)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                 filter === tab.key
-                  ? "bg-accent text-white shadow-lg shadow-accent/25"
+                  ? "bg-accent/20 text-accent-light border border-accent/40"
                   : "bg-card text-muted hover:text-foreground border border-border hover:border-accent/50"
               }`}
             >
@@ -172,7 +216,7 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-3">
             {filteredPosts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostCard key={post.id} post={post} onStatusChange={fetchPosts} />
             ))}
           </div>
         )}
